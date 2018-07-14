@@ -14,6 +14,12 @@ bot=commands.Bot(command_prefix='a.')
 async def on_ready():
     print("hi")
     
+    
+@bot.command(pass_context=True)
+async def join(ctx):
+    channel = ctx.message.author.voice.voice_channel
+    await bot.join_voice_channel(channel)
+
 
 
 players={}
