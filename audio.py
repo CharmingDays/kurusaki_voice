@@ -2,10 +2,18 @@ import discord
 import asyncio
 import youtube_dl
 import os
+from discord.ext import commands
+from discord.ext.commands import Bot
+
+
+bot=commands.Bot(command_prefix='a.')
 
 
 
-
+@bot.event
+async def on_ready():
+    print("hi")
+    
 
 
 players={}
