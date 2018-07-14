@@ -1,6 +1,6 @@
 import discord
 import asyncio
-import youtube-dl
+import youtube_dl
 import os
 
 
