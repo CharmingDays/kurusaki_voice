@@ -55,11 +55,6 @@ async def play(ctx, url):
         await bot.say("Can not play live audio yet.")
     elif player.is_live == False:
         player.start()
-        embed = discord.Embed(title="Currently Playing", color=0xDEADBF)
-        embed.add_field(name='Title', value=player.title, inline=False)
-        embed.add_field(name='Duration', value=player.duration, inline=False)
-        embed.add_field(name='Views', value=player.views, inline=False)
-        await bot.say(embed=embed)
 
 
 async def pause(ctx):
