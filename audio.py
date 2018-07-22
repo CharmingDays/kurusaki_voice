@@ -33,7 +33,10 @@ load_opus_lib()
 @bot.event
 async def on_ready():
     print("hi")
-    
+opts = {
+            'default_search': 'auto',
+            'quiet': True,
+        }    
     
 @bot.command(pass_context=True)
 async def join(ctx):
@@ -49,7 +52,7 @@ async def play(ctx, url):
     play_server = ctx.message.server
     voice = bot.voice_client_in(play_server)
     global player
-    player = await voice.create_ytdl_player(url)
+    player = await voice.create_ytdl_player(url,ytdl_options=opts)
     players[play_server.id] = player
     if player.is_live == True:
         await bot.say("Can not play live audio yet.")
