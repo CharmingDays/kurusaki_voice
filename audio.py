@@ -47,7 +47,7 @@ async def join(ctx):
 
 players={}
 @bot.command(pass_context=True)
-async def play(ctx, url):
+async def play(ctx, *,url):
     global play_server
     play_server = ctx.message.server
     voice = bot.voice_client_in(play_server)
