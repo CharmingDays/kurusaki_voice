@@ -54,6 +54,7 @@ async def play(ctx, *,url):
     if ctx.message.server.id not in in_voice:
       channel = ctx.message.author.voice.voice_channel
       await bot.join_voice_channel(channel)
+      in_voice.append(ctx.message.server.id)
       
       
     voice = bot.voice_client_in(ctx.message.server)
