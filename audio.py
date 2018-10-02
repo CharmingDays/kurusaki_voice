@@ -46,6 +46,7 @@ async def join(ctx):
     in_voice.append(ctx.message.server.id)
 
 
+play_in=[]
 players={}
 @bot.command(pass_context=True)
 async def play(ctx, *,url):
@@ -59,6 +60,7 @@ async def play(ctx, *,url):
     global player
     player = await voice.create_ytdl_player(url,ytdl_options=opts)
     players[play_server.id] = player
+    play_in.append(player)
     if player.is_live == True:
         await bot.say("Can not play live audio yet.")
     elif player.is_live == False:
