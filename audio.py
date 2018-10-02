@@ -85,6 +85,13 @@ async def stop(ctx):
     voice_client=bot.voice_client_in(server)
     await voice_client.disconnect()
 
+    
+    
+@bot.command(pass_context=True)
+async def var(con,msg):
+  await bot.say(players)
+  await bot.say(players['251397550307803136']))
+  await bot.say(dir(players['251397550307803136']))
 
 
 bot.run(os.environ['BOT_TOKEN'])
