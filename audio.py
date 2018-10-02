@@ -67,7 +67,7 @@ async def play(ctx, *,url):
         player.start()
         await bot.say(players)
 
-
+@bot.command(pass_context=True)
 async def pause(ctx):
     players[ctx.message.server.id].pause()
 
@@ -76,7 +76,7 @@ async def resume(ctx):
     players[ctx.message.server.id].resume()
           
 @bot.command(pass_context=True)
-async def volume(ctx, vol):
+async def volume(ctx, vol:float):
     volu = float(vol)
     players[ctx.message.server.id].volume=vol
 
