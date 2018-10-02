@@ -28,6 +28,7 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
                        (', '.join(opus_libs)))
 load_opus_lib()
 
+in_voice=[]
 
 
 @bot.event
@@ -42,12 +43,16 @@ opts = {
 async def join(ctx):
     channel = ctx.message.author.voice.voice_channel
     await bot.join_voice_channel(channel)
-
+    in_voice.append(ctx.message.server.id)
 
 
 players={}
 @bot.command(pass_context=True)
 async def play(ctx, *,url):
+    if ctx.message.server.id not in in_voice:
+      channel = ctx.message.author.voice.voice_channel
+      await bot.join_voice_channel(channel)
+
     global play_server
     play_server = ctx.message.server
     voice = bot.voice_client_in(play_server)
@@ -74,6 +79,8 @@ async def volume(ctx, vol):
 
 @bot.command(pass_context=True)
 async def stop(ctx):
+    pos=in_voice.index(ctx.message.server.id)
+    del in_voice[pos]
     server=ctx.message.server
     voice_client=bot.voice_client_in(server)
     await voice_client.disconnect()
