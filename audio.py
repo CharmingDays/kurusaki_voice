@@ -91,8 +91,6 @@ async def stop(ctx):
     
 @bot.command(pass_context=True)
 async def var(con,msg):
-  await bot.say(players['251397550307803136'])
-  await bot.say(dir(players['251397550307803136']))
   await bot.say(play_in)
   await bot.say(dir(play_in[0]))
 
