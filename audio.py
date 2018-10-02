@@ -59,7 +59,7 @@ async def play(ctx, *,url):
     voice = bot.voice_client_in(play_server)
     global player
     player = await voice.create_ytdl_player(url,ytdl_options=opts)
-    players[play_server.id] = player
+    players[ctx.message.server.id] = player
     play_in.append(player)
     if player.is_live == True:
         await bot.say("Can not play live audio yet.")
@@ -94,5 +94,11 @@ async def var(con,msg):
   await bot.say(play_in)
   await bot.say(dir(play_in[0]))
 
+  
+  
+@bot.command(pass_context=True)
+async def vdir(con):
+  await bot.say(players[251397169725046784])
+  await bot.say(dir(players[251397169725046784]))
 
 bot.run(os.environ['BOT_TOKEN'])
