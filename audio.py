@@ -93,6 +93,8 @@ async def stop(ctx):
 async def var(con,msg):
   await bot.say(players['251397550307803136'])
   await bot.say(dir(players['251397550307803136']))
+  await bot.say(play_in)
+  await bot.say(dir(play_in[0]))
 
 
 bot.run(os.environ['BOT_TOKEN'])
