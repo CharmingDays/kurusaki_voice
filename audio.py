@@ -33,11 +33,7 @@ in_voice=[]
 
 @bot.event
 async def on_ready():
-    print("hi")
-opts = {
-            'default_search': 'auto',
-            'quiet': True,
-        }    
+    print("hi")    
     
 @bot.command(pass_context=True)
 async def join(ctx):
@@ -50,34 +46,39 @@ play_in=[]
 players={}
 @bot.command(pass_context=True)
 async def play(ctx, *,url):
+    opts = {
+            'default_search': 'auto',
+            'quiet': True,
+        }
+  
     if ctx.message.server.id not in in_voice:
       channel = ctx.message.author.voice.voice_channel
       await bot.join_voice_channel(channel)
-
-    global play_server
-    play_server = ctx.message.server
-    voice = bot.voice_client_in(play_server)
+      
+      
+    voice = bot.voice_client_in(ctx.message.server)
     global player
     player = await voice.create_ytdl_player(url,ytdl_options=opts)
     players[ctx.message.server.id] = player
     play_in.append(player)
-    if player.is_live == True:
+    if players[ctx.message.server.id].is_live == True:
         await bot.say("Can not play live audio yet.")
-    elif player.is_live == False:
+    elif players[ctx.message.server.id].is_live == False:
         player.start()
+        await bot.say(players)
 
 
 async def pause(ctx):
-    player.pause()
+    players[ctx.message.server.id].pause()
 
 @bot.command(pass_context=True)
 async def resume(ctx):
-    player.resume()
+    players[ctx.message.server.id].resume()
           
 @bot.command(pass_context=True)
 async def volume(ctx, vol):
-    vol = float(vol)
-    vol = player.volume = vol
+    volu = float(vol)
+    players[ctx.message.server.id].volume=vol
 
 @bot.command(pass_context=True)
 async def stop(ctx):
