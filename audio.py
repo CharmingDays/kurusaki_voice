@@ -44,29 +44,43 @@ async def join(ctx):
 
 play_in=[]
 players={}
+songs={}
+playing={}
 @bot.command(pass_context=True)
 async def play(ctx, *,url):
     opts = {
             'default_search': 'auto',
             'quiet': True,
         }
-  
+    def player_in(con):
+        if len(songs[con.message.server.id]) == 0:
+            playing[con.message.server.id]=False
+
+        if len(songs[con.message.server.id]) != 0:
+            songs[con.message.server.id].start()
+    try:
+        if playing[ctx.message.server.id] == True:
+            voice = bot.voice_client_in(ctx.message.server)
+            song=await voice.create_ytdl_player()
+            songs[ctx.message.server.id]=[]
+            songs[ctx.message.server.id].append(song)
+    except KeyError:
+        pass
     if ctx.message.server.id not in in_voice:
       channel = ctx.message.author.voice.voice_channel
       await bot.join_voice_channel(channel)
       in_voice.append(ctx.message.server.id)
       
-      
     voice = bot.voice_client_in(ctx.message.server)
     global player
-    player = await voice.create_ytdl_player(url,ytdl_options=opts)
+    player = await voice.create_ytdl_player(url,ytdl_options=opts,after= lambda : player_in(ctx))
     players[ctx.message.server.id] = player
     play_in.append(player)
     if players[ctx.message.server.id].is_live == True:
         await bot.say("Can not play live audio yet.")
     elif players[ctx.message.server.id].is_live == False:
         player.start()
-        await bot.say(players)
+        playing[ctx.message.server.id]=True
 
 @bot.command(pass_context=True)
 async def pause(ctx):
@@ -89,18 +103,6 @@ async def stop(ctx):
     voice_client=bot.voice_client_in(server)
     await voice_client.disconnect()
 
-    
-    
-@bot.command(pass_context=True)
-async def var(con,msg):
-  await bot.say(play_in)
-  await bot.say(dir(play_in[0]))
 
-  
-  
-@bot.command(pass_context=True)
-async def vdir(con):
-  await bot.say(players[251397169725046784])
-  await bot.say(dir(players[251397169725046784]))
 
 bot.run(os.environ['BOT_TOKEN'])
