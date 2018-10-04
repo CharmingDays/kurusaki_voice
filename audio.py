@@ -137,6 +137,13 @@ async def volume(ctx, vol:float):
     volu = float(vol)
     players[ctx.message.server.id].volume=volu
 
+
+@bot.command(pass_context=True)
+async def skip(con): #skipping songs?
+  songs[con.message.server.id]
+    
+    
+    
 @bot.command(pass_context=True)
 async def stop(con):
     players[con.message.server.id].stop()
@@ -150,6 +157,6 @@ async def leave(ctx):
     voice_client=bot.voice_client_in(server)
     await voice_client.disconnect()
     songs.clear()
-
+    
 
 bot.run(os.environ['BOT_TOKEN'])
