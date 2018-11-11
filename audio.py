@@ -3,6 +3,7 @@ import asyncio
 import youtube_dl
 from discord.ext import commands
 import requests as rq
+import os
 
 bot = commands.Bot(command_prefix='a.')
 bot.remove_command('help')
@@ -218,6 +219,6 @@ async def resume(con):
                 paused[con.message.server.id]=False
 
 
-bot.run('BOT TOKEN')
+bot.run(os.environ['BOT_TOKEN'])
 
 #   run multiple functions after the play for loop
