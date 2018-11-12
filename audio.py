@@ -2,7 +2,6 @@ import discord
 import asyncio
 import youtube_dl
 from discord.ext import commands
-import requests as rq
 import os
 
 bot = commands.Bot(command_prefix='a.')
