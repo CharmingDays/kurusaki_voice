@@ -4,7 +4,7 @@ import youtube_dl
 from discord.ext import commands
 import os
 
-bot = commands.Bot(command_prefix='a.')
+bot = commands.Bot(command_prefix='.')
 bot.remove_command('help')
 from discord import opus
 OPUS_LIBS = ['libopus-0.x86.dll', 'libopus-0.x64.dll',
