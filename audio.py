@@ -16,7 +16,7 @@ def get_prefix(bot, msg):
 
     me=['nep.','k.','saki.','a.','s.']
 
-    if msg.author.id == '185181025104560128':
+    if msg.author.id == '123123123123':
         return commands.when_mentioned_or(*me)(bot, msg)
 
 
