@@ -285,7 +285,6 @@ async def pause(con):
 
 
 
-
 @bot.command(pass_context=True)
 async def resume(con):
     # COMMAND IS IN DM
@@ -312,14 +311,6 @@ async def volume(con,vol:float):
 
 
 
-
-# if __name__ == "__main__":
-#     for extension in extensions:
-#         try:
-#             bot.load_extension(extension)
-#             print("{} loaded".format(extension))
-#         except Exception as error:
-#             print("Unable to load extension {} error {}".format(extension, error))
 
 
 bot.run(os.environ['BOT_TOKEN']) #do not post your bot token publically 
