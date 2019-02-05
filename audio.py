@@ -6,6 +6,8 @@ from discord.utils import find
 import requests as rq
 import os
 
+
+bot = commands.Bot(command_prefix='.')
 def get_prefix(bot, msg):
     """A callable Prefix for our bot. This could be edited to allow per server prefixes."""
 
@@ -22,7 +24,6 @@ def get_prefix(bot, msg):
 
 
 bot = commands.Bot(command_prefix=get_prefix,description='A music bot fro discord Kurusaki')
-
 bot.remove_command('help')
 
 # extensions=['server_songs']
