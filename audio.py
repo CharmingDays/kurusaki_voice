@@ -313,3 +313,4 @@ async def volume(con,vol:float):
 
 
 bot.run(os.environ['BOT_TOKEN']) #do not post your bot token publically 
+#`bot.run("your bot token here")` You can alternatively run the bot like this  if you make this repo private.
