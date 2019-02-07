@@ -7,7 +7,6 @@ import requests as rq
 import os
 
 
-bot = commands.Bot(command_prefix='.')
 def get_prefix(bot, msg):
     """A callable Prefix for our bot. This could be edited to allow per server prefixes."""
 
