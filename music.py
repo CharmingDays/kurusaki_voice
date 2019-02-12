@@ -87,11 +87,11 @@ async def set_player_status():
 
 
 async def bg():
-    bot.loop.create_task(set_player_status())
+    await set_player_status()
 
 @bot.event
 async def on_ready():
-    bot.loop.create_task(bg())
+    await bg()
     print(bot.user.name)
 
 
@@ -123,7 +123,7 @@ async def queue_songs(con, skip, clear):
                                ['thumbnails']['default']['url'])
             pack.add_field(name="Requested by:", value=con.message.author.name)
 
-            song = await bot.voice_client_in(con.message.server).create_ytdl_player(song_names[con.message.server.id][0], ytdl_options=opts, after=lambda: bot.loop.create_task(after_song(con, False, False)))
+            song = await bot.voice_client_in(con.message.server).create_ytdl_player(song_names[con.message.server.id][0], ytdl_options=opts, after=lambda: await after_song(con, False, False))
             servers_songs[con.message.server.id] = song
             servers_songs[con.message.server.id].start()
             await bot.delete_message(now_playing[con.message.server.id])
@@ -138,7 +138,7 @@ async def queue_songs(con, skip, clear):
 
 
 async def after_song(con, skip, clear):
-    bot.loop.create_task(queue_songs(con, skip, clear))
+    await queue_songs(con, skip, clear)
 
 
 @bot.command(pass_context=True)
@@ -161,7 +161,7 @@ async def play(con, *, url):
             if player_status[con.message.server.id] == False:
                 player_status[con.message.server.id] = True
                 song_names[con.message.server.id].append(url)
-                song = await bot.voice_client_in(con.message.server).create_ytdl_player(song_names[con.message.server.id][0], ytdl_options=opts, after=lambda: bot.loop.create_task(after_song(con, False, False)))
+                song = await bot.voice_client_in(con.message.server).create_ytdl_player(song_names[con.message.server.id][0], ytdl_options=opts, after=lambda: await after_song(con, False, False))
                 servers_songs[con.message.server.id] = song
                 servers_songs[con.message.server.id].start()
                 r = rq.Session().get('https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q={}&key={}'.format(url,youtube_api)).json()
@@ -187,7 +187,7 @@ async def skip(con):
         if servers_songs[con.message.server.id] == None or len(song_names[con.message.server.id]) == 0 or player_status[con.message.server.id] == False:
             await bot.send_message(con.message.channel, "**No songs in queue to skip**")
         if servers_songs[con.message.server.id] != None:
-            bot.loop.create_task(queue_songs(con, True, False))
+            await queue_songs(con, True, False)
 
 @bot.command(pass_context=True)
 async def join(con,*,channel=None):
@@ -239,7 +239,7 @@ async def leave(con):
 
         # VOICE ALREADY CONNECTED
         if bot.is_voice_connected(con.message.server) == True:
-            bot.loop.create_task(queue_songs(con, False, True))
+            await queue_songs(con, False, True)
 
 @bot.command(pass_context=True)
 async def pause(con):
