@@ -136,10 +136,8 @@ async def queue_songs(con, skip, clear):
         if len(song_names[con.message.server.id]) == 0 and servers_songs[con.message.server.id] == None:
             player_status[con.message.server.id] = False
 
-
 async def after_song(con, skip, clear):
-    await queue_songs(con, skip, clear)
-
+    bot.loop.create_task(queue_songs(con, skip, clear))
 
 @bot.command(pass_context=True)
 async def play(con, *, url):
