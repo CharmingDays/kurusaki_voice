@@ -15,7 +15,7 @@ def get_prefix(bot, msg):
     return commands.when_mentioned_or(*prefixes)(bot, msg)
 
 bot = commands.Bot(command_prefix=get_prefix)
-YOUTUBE_API = 'YOUR YOUTUBE API TOKEN HERE'
+YOUTUBE_API = 'YOUR YOUTUBE API TOKEN KEY HERE'
 
 
 bot.remove_command('help')
@@ -68,16 +68,6 @@ async def on_ready():
     print(bot.user.name)
 
 
-@bot.command(pass_context=True)
-async def leave(msg):
-    await bot.voice_client_in(msg.message.server).disconnect()
-
-@bot.command(pass_context=True)
-async def join(msg):
-    await bot.join_voice_channel(msg.message.author.voice_channel)
-
-
-
 
 async def player_control(server):
     if players[server.id]['songs']:
@@ -87,7 +77,9 @@ async def player_control(server):
         emb.set_thumbnail(url=players[server.id]['songs'][0]['thumbnail'])
         emb.add_field(name='Published At',value=players[server.id]['songs'][0]['publish'])
         emb.set_footer(icon_url=players[server.id]['songs'][0]['author'].avatar_url,text='Requested by {}'.format(players[server.id]['songs'][0]['author'].display_name))
-        await bot.send_message(players[server.id]['songs'][0]['channel'], embed=emb)
+        message=await bot.send_message(players[server.id]['songs'][0]['channel'], embed=emb)
+        await bot.delete_message(players[server.id]['message'])
+        players[server.id]['message']=message
         players[server.id]['stream'].start()
         players[server.id]['songs'].pop(0)
 
@@ -97,6 +89,11 @@ async def player_control(server):
 
 @bot.command(pass_context=True)
 async def play(msg,*,song):
+    """
+    Play an audio of the link or name of song you provide
+    Command: s.play <Song name or url>
+    Example: s.play I'm nothing but a 2D girl
+    """
 
     voice_client=bot.voice_client_in(msg.message.server)
     song_pack=rq.get("https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q={}&key={}".format(song,YOUTUBE_API)).json()
@@ -129,28 +126,66 @@ async def play(msg,*,song):
         players[msg.message.server.id]={
             "stream":await voice_client.create_ytdl_player(url=song,ytdl_options=opts,before_options=beforeOps,after= lambda: bot.loop.create_task(player_control(msg.message.server))),
             "songs":[],
-            "status":False
+            "status":False,
+            "message":None
             }
         emb = discord.Embed(title=song_pack['items'][0]['snippet']['title'], url="https://www.youtube.com/watch?v={}".format(song_pack['items'][0]['id']['videoId']))
         emb.set_thumbnail(url=song_pack['items'][0]['snippet']['thumbnails']['high']['url'])
         emb.add_field(name='Published at',value=song_pack['items'][0]['snippet']['publishedAt'])
         emb.set_footer(icon_url=msg.message.author.avatar_url,text=f'Requested by: {msg.message.author.display_name}')
-        await bot.say(embed=emb)
+        message=await bot.say(embed=emb)
+        players[msg.message.server.id]['message']=message
         players[msg.message.server.id]['stream'].start()
 
 
 
 
 
+
+@bot.command(pass_context=True)
+async def leave(msg):
+    """
+    Leave the voice channel, clear the songs list and stop the audio
+    Command: s.leave
+    Example: s.leave
+    """
+    if msg.message.server.id in players:
+        await bot.voice_client_in(msg.message.server).disconnect()
+        players[msg.message.server.id]['stream']=None
+        players[msg.message.server.id]['songs'].clear()
+        players[msg.message.server.id]['status']=False
+        players[msg.message.server.id]['message'] = None
+
+    else:
+        await bot.say("No audio currently playing")
+
+
+@bot.command(pass_context=True)
+async def join(msg):
+    """
+    Join a voice channel that you are currently in
+    Command: s.join
+    Example: s.join
+    """
+    await bot.join_voice_channel(msg.message.author.voice_channel)
+
+
 @bot.command(pass_context=True)
 async def pause(msg):
+    """
+    Pause the current audio streamer
+    Command: s.pause
+    Example: s.pause
+    """
     if msg.message.server.id in players:
         if players[msg.message.server.id]['stream'] != None:
+            if players[msg.message.server.id]['status'] == True:
+                await bot.say("Audio already paused")
+            
             if players[msg.message.server.id]['status'] == False:
                 players[msg.message.server.id]['stream'].pause()
                 players[msg.message.server.id]['status']=True
-            if players[msg.message.server.id]['status'] == True:
-                await bot.say("Audio already paused")
+            
 
         else:
             await bot.say("No audio playing in voice channel")
@@ -160,12 +195,19 @@ async def pause(msg):
 
 @bot.command(pass_context=True)
 async def resume(msg):
+    """
+    Resume the current audio streamer
+    Command: s.resume
+    Example: s.resume
+    """
     if msg.message.server.id in players:
         if players[msg.message.server.id]['stream'] !=None:
-            if players[msg.message.server.id]['status'] == True:
-                players[msg.message.server.id]['stream'].resume()
             if players[msg.message.server.id]['status'] == False:
                 await bot.say("Audio already playing")
+            
+            if players[msg.message.server.id]['status'] == True:
+                players[msg.message.server.id]['stream'].resume()
+            
         else:
             await bot.say("No audio playing in voice channel")
     else:
@@ -175,6 +217,11 @@ async def resume(msg):
 
 @bot.command(pass_context=True)
 async def volume(msg,vol:float):
+    """
+    Change the volume of the current audio streamer (1.0 == 100% and 2.0 == 200%)
+    Command: s.volume <volume_amount>
+    Example: s.volume 1.5
+    """
     if msg.message.server.id in players:
         if players[msg.message.server.id]['stream'] !=None:
             players[msg.message.server.id]['stream'].volume(vol)
@@ -183,11 +230,37 @@ async def volume(msg,vol:float):
 
 @bot.command(pass_context=True)
 async def skip(msg):
-    pass
+    """
+    Skip the current song that's playing
+    Command: s.skip
+    Example: s.skip
+    """
+    if msg.message.server.id in players:
+        if players[msg.message.server.id]['stream'] !=None:
+            if not players[msg.message.server.id]['songs']:
+                players[msg.message.server.id]['stream'].stop()
+                await player_control(msg.message.server)
+                reply=await bot.say("Skipped song\nNo songs in queue to play next")
+                await asyncio.sleep(10)
+                await bot.delete_message(reply)
+            
+            if players[msg.message.server.id]['songs']:
+                players[msg.message.server.id]['stream'].stop()
+                reply=await bot.say("Song Skipped")
+                await asyncio.sleep(10)
+                await bot.delete_message(reply)
+
+        if players[msg.message.server.id]['stream']== None:
+            await bot.say("No audio currently playing")
 
 
 @bot.command(pass_context=True)
 async def clear_songs(msg):
+    """
+    Clear the songs and also stop the current audio playing
+    Command: s.clear
+    Example: s.clear
+    """
     if msg.message.server.id in players:
         if players[msg.message.server.id]['stream'] != None:
             players[msg.message.server.id]['stream'].stop()
@@ -200,8 +273,14 @@ async def clear_songs(msg):
     else:
         await bot.say("No songs playing or in queue")
 
+
 @bot.command(pass_context=True)
 async def songs(msg):
+    """
+    Check the current lists of songs that are in queue
+    Command: s.songs
+    Example: s.songs
+    """
     if msg.message.server.id in players:
         if players[msg.message.server.id]['songs']:
             song_order=discord.Embed(title='Songs')
@@ -212,5 +291,4 @@ async def songs(msg):
             await bot.say("Currently no songs in queue")
 
 
-
-bot.run('bot token')
+bot.run('YOUR BOT TOKEN HERE')
