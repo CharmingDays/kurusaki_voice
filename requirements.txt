@@ -1,4 +1,4 @@
-discord.py==0.16.12
+git+https://github.com/Rapptz/discord.py@async
 asyncio
 youtube-dl
 PyNaCl
