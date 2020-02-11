@@ -7,3 +7,6 @@ https://developers.google.com/youtube/v3/getting-started
 
 To create your project and credentials 
 https://console.cloud.google.com
+
+
+### I recommend using the [re-write branch](https://github.com/CharmingMother/kurusaki_voice/tree/re-write(master))
