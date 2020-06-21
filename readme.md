@@ -1,14 +1,9 @@
 # This repository's purpose is just an EXAMPLE code for the video in playing audio from heroku. 
-
-## For command help menu, mention the bot and type help or enter s.help
-=======
-# This bot has a code that requires Youtube API Credentials
-# To get your Youtube API Token follow the instructions in the links provided 
-https://developers.google.com/youtube/v3/getting-started
-
-
-To create your project and credentials 
-https://console.cloud.google.com
-
-
-### I recommend using the [re-write branch](https://github.com/CharmingMother/kurusaki_voice/tree/re-write(master)
+#### For command help menu, mention the bot and type help or enter `s.help`
+### You will require build packs in Heroku for your bot to be able to play audio on discord. 
+#### You will prorably not need all the ffmpeg buildpacks and will probably only need `jonathanong-ffmpeg` but get all of them just to be safe. You may need to mess around with other settings to fix errors if they occur
+### [guilherme-ffprobe](https://github.com/guilherme-otran/heroku-buildpack-ffprobe.git)
+### [jonathanong-ffmpeg](https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git)
+### [kitcast-ffmpeg](https://github.com/kitcast/buildpack-ffmpeg.git)
+### [alevfalse-ffmpeg](https://github.com/alevfalse/heroku-buildpack-ffmpeg.git)
+### [Crazycatz00-opus](https://github.com/Crazycatz00/heroku-buildpack-libopus.git)
