@@ -1,5 +1,4 @@
-git+https://github.com/Rapptz/discord.py@async
+discord
 asyncio
 youtube-dl
 PyNaCl
-requests

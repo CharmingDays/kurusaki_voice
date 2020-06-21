@@ -1,35 +1,37 @@
-import discord
-import asyncio
-import youtube_dl
+import discord,asyncio,random,pymongo,youtube_dl,string,os,functools,json
 from discord.ext import commands
-import requests as rq
-from discord import opus
+from discord.ext.commands import command
 
 
-bot = commands.Bot(command_prefix='.')
-YOUTUBE_API = 'YOUR YOUTUBE API TOKEN HERE'
+
+#TODO: CREATE PLAYLIST SUPPORT FOR MUSIC
 
 
-bot.remove_command('help')
-OPUS_LIBS = ['libopus-0.x86.dll', 'libopus-0.x64.dll','libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib']
 
-def load_opus_lib(opus_libs=OPUS_LIBS):
-    if opus.is_loaded():
-        return True
+#flat-playlist:True?
+#|
+#|
+#extract_flat:True
+ytdl_format_options= {
+    'format': 'bestaudio/best',
+    'outtmpl': '{}',
+    'restrictfilenames': True,
+    'noplaylist': True,
+    'nocheckcertificate': True,
+    'ignoreerrors': True,
+    'logtostderr': False,
+    "extractaudio":True,
 
-    for opus_lib in opus_libs:
-            try:
-                opus.load_opus(opus_lib)
-                return
-            except OSError:
-                pass
-
-    raise RuntimeError('Could not load an opus lib. Tried %s' %(', '.join(opus_libs)))
-load_opus_lib()
-
-
-opts = {
+    "audioformat":"opus",
+    'quiet': True,
+    'no_warnings': True,
     'default_search': 'auto',
+    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+}
+
+stim= {
+    'default_search': 'auto',
+    "ignoreerrors":True,
     'quiet': True,
     "no_warnings": True,
     "simulate": True,  # do not keep the video files
@@ -37,273 +39,469 @@ opts = {
     "keepvideo": False,
     "noplaylist": True,
     "skip_download": False,
-    "prefer_ffmpeg": True
-}  # youtube_dl options
-beforeOps = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
-players={}
+    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+}
 
 
-async def background_player(msg,song):
-    voice_client = bot.voice_client_in(msg.message.server)
-    song_pack = rq.get(
-        "https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q={}&key={}".format(song, YOUTUBE_API)).json()
-    song = "https://www.youtube.com/watch?v={}".format(
-        song_pack['items'][0]['id']['videoId'])
+ffmpeg_options = {
+    'options': '-vn'
+}
 
-    if msg.message.server.id in players:
-        data = {
-            "song": song,
-            "title": song_pack['items'][0]['snippet']['title'],
-            "url": "https://www.youtube.com/watch?v={}".format(song_pack['items'][0]['id']['videoId']),
-            "thumbnail": song_pack['items'][0]['snippet']['thumbnails']['high']['url'],
-            "author": msg.message.author,
-            "publish": song_pack['items'][0]['snippet']['publishedAt'],
-            "channel": msg.message.channel
+class Downloader(discord.PCMVolumeTransformer):
+    def __init__(self,source,*,data,volume=0.6):
+        super().__init__(source,volume)
+        self.data=data
+        self.title=data.get('title')
+        self.url=data.get("url")
+        self.thumbnail=data.get('thumbnail')
+        self.duration=data.get('duration')
+        self.views=data.get('view_count')
+        self.playlist={}
+
+
+
+
+    @classmethod
+    async def video_url(cls,url,ytdl,*,loop=None,stream=False):
+        loop=loop or asyncio.get_event_loop()
+        data= await loop.run_in_executor(None,lambda: ytdl.extract_info(url,download=not stream))
+        data1={'queue':[]}
+        if 'entries' in data:
+            if len(data['entries']) >1:
+                playlist_titles=[title['title'] for title in data['entries']]
+                data1={'title':data['title'],'queue':playlist_titles}
+                data1['queue'].pop(0)
+
+            data=data['entries'][0]
+                
+        filename=data['url'] if stream else ytdl.prepare_filename(data)
+        return cls(discord.FFmpegPCMAudio(filename,**ffmpeg_options),data=data),data1
+
+
+
+    async def get_info(self,url):
+        yt=youtube_dl.YoutubeDL(stim)
+        down=yt.extract_info(url,download=False)
+        data1={'queue':[]}
+        if 'entries' in down:
+            if len(down['entries']) > 1:
+                playlist_titles=[title['title'] for title in down['entries']]
+                data1={'title':down['title'],'queue':playlist_titles}
+
+            down=down['entries'][0]['title']
+            
+        return down,data1
+
+
+class MusicPlayer(commands.Cog,name='Music'):
+    def __init__(self,client):
+        self.bot=client
+        # self.database = pymongo.MongoClient(os.getenv('MONGO'))['Discord-Bot-Database']['General'] #NOTE: YOU WILL NOT NEED THIS UNLESS YOU'RE USING MONGODB
+        # self.music=self.database.find_one('music') #NOTE: YOU WILL NOT NEED THIS UNLESS YOU'RE USING MONGODB
+        self.player={
+            "audio_files":[]
         }
-        if players[msg.message.server.id]['stream'] != None:
-            players[msg.message.server.id]['songs'].append(data)
-            await bot.send_message(msg.message.channel,"Song **{}** queued".format(data['title']))
-
-        if not players[msg.message.server.id]['songs'] and players[msg.message.server.id]['stream'] == None:
-            players[msg.message.server.id]['stream'] = await voice_client.create_ytdl_player(url=song, ytdl_options=opts, before_options=beforeOps, after=lambda: bot.loop.create_task(player_control(msg.message.server)))
-            emb = discord.Embed(title=data['title'], url=data['url'])
-            emb.set_thumbnail(url=data['thumbnail'])
-            emb.add_field(name='Published At', value=data['publish'])
-            emb.set_footer(icon_url=msg.message.author.avatar_url,text='Requested by {}'.format(msg.message.author.display_name))
-            await bot.send_message(msg.message.channel,embed=emb)
-            players[msg.message.server.id]['stream'].volume = players[msg.message.server.id]['volume']
-            players[msg.message.server.id]['stream'].start()
-
-    if msg.message.server.id not in players:
-        players[msg.message.server.id] = {
-            "stream": await voice_client.create_ytdl_player(url=song, ytdl_options=opts, before_options=beforeOps, after=lambda: bot.loop.create_task(player_control(msg.message.server))),
-            "songs": [],
-            "status": False,
-            "message": None,
-            "volume":1
+        #NOTE: AN EXAMPLE OF HOW THE `self.player` DICT IS GOING TO LOOK LIKE
+        self.__player={
+            "audio_files":[],
+            "guildId: int":{
+                "player":'player object', #NOTE: get current songs from player
+                'queue':[{'title':'the sound of silence','author':'`user object`'},{'title':"Hello - Adel",'author':'`user object`'}],
+                'play':'True/False| pause/play',
+                'name':'current audio file name',
+                'author':'user obj',
+                'repeat':False
+            }
         }
-        emb = discord.Embed(title=song_pack['items'][0]['snippet']['title'],
-                            url="https://www.youtube.com/watch?v={}".format(song_pack['items'][0]['id']['videoId']))
-        emb.set_thumbnail(
-            url=song_pack['items'][0]['snippet']['thumbnails']['high']['url'])
-        emb.add_field(name='Published at',value=song_pack['items'][0]['snippet']['publishedAt'])
-        emb.set_footer(icon_url=msg.message.author.avatar_url,text=f'Requested by: {msg.message.author.display_name}')
-        players[msg.message.server.id]['message'] = await bot.send_message(msg.message.channel, embed=emb)
-        players[msg.message.server.id]['stream'].volume =players[msg.message.server.id]['volume']
-        players[msg.message.server.id]['stream'].start()
+
+    def random_color(self):
+        return random.randint(1,255)
 
 
 
+    @commands.Cog.listener('on_voice_state_update')
+    async def music_voice(self,user,before,after):
+        if after.channel is None and user.id == self.bot.user.id:
+            try:
+                self.player[user.guild.id]['queue'].clear()
+            except KeyError:
+                print(f"Failed to get guild id {user.guild.id}")
 
 
 
+    async def filename_generator(self):
+        chars=list(string.ascii_letters+string.digits)
+        name=''
+        for i in range(random.randint(9,25)):
+            name+=random.choice(chars)
+        
+        if name not in self.player['audio_files']:
+            return name
+
+        
+        return await self.filename_generator()
 
 
-@bot.event
-async def on_command_error(error,msg):
-    if isinstance(error,commands.errors.CommandInvokeError):
-        if error.args[0] == 'Command raised an exception: ClientException: Already connected to a voice channel in this server':
-            await bot.send_message(msg.message.channel,"**Bot already in a voice channel**")
-        if error.args[0].startswith('Command raised an exception: TimeoutError:'):
-            pass
-
-        if error.args[0] == "Command raised an exception: AttributeError: 'NoneType' object has no attribute 'disconnect'":
-            await bot.send_message(msg.message.channel,'**Bot already left the voice channel**')
-
-        if error.args[0] == "Command raised an exception: AttributeError: 'NoneType' object has no attribute 'create_ytdl_player'":
-            if msg.message.author.voice_channel != None:
-                await bot.join_voice_channel(msg.message.author.voice_channel)
-                await background_player(msg,msg.message.content[6:])
-            
-            if msg.message.author.voice_channel == None:
-                await bot.send_message(msg.message.channel,"**You are must be in a voice channel to use this command**")
-
-
-@bot.event
-async def on_ready():
-    print(bot.user.name)
+    async def playlist(self,data,msg):
+        for i in data['queue']:
+            self.player[msg.guild.id]['queue'].append({'title':i,'author':msg})
 
 
 
-async def player_control(server):
-    if players[server.id]['songs']:
-        await bot.delete_message(players[server.id]['message'])
-        voice_client = bot.voice_client_in(server)
-        players[server.id]['stream']=await voice_client.create_ytdl_player(url=players[server.id]['songs'][0]['song'],ytdl_options=opts,before_options=beforeOps,after=lambda: bot.loop.create_task(player_control(server)))
-        emb = discord.Embed(title=players[server.id]['songs'][0]['title'],url=players[server.id]['songs'][0]['url'])
-        emb.set_thumbnail(url=players[server.id]['songs'][0]['thumbnail'])
-        emb.add_field(name='Published At',value=players[server.id]['songs'][0]['publish'])
-        emb.set_footer(icon_url=players[server.id]['songs'][0]['author'].avatar_url,text='Requested by {}'.format(players[server.id]['songs'][0]['author'].display_name))
-        players[server.id]['message'] = await bot.send_message(players[server.id]['songs'][0]['channel'], embed=emb)
-        players[server.id]['stream'].volume = players[server.id]['volume']
-        players[server.id]['stream'].start()
-        players[server.id]['songs'].pop(0)
-
-    else:
-        players[server.id]['stream']=None
-
-
-@bot.command(pass_context=True)
-async def play(msg,*,song):
-    """
-    Play an audio of the link or name of song you provide
-    Command: s.play <Song name or url>
-    Example: s.play I'm nothing but a 2D girl
-    """
-    await background_player(msg,song)
+    async def queue(self,msg,song):
+        title1=await Downloader.get_info(self,url=song)
+        title=title1[0]
+        data=title1[1]
+        #NOTE:needs fix here
+        if data['queue']:
+            await self.playlist(data,msg)
+            return await msg.send(f"Added playlist {data['title']} to queue") #NOTE: needs to be embeded to make it better output
+        self.player[msg.guild.id]['queue'].append({'title':title,'author':msg})
+        return await msg.send(f"**{title} added to queue**".title())
 
 
 
-
-@bot.command(pass_context=True)
-async def leave(msg):
-    """
-    Leave the voice channel, clear the songs list and stop the audio
-    Command: s.leave
-    Example: s.leave
-    """
-    if msg.message.server.id in players:
-        await bot.voice_client_in(msg.message.server).disconnect()
-        players[msg.message.server.id]['stream']=None
-        players[msg.message.server.id]['songs'].clear()
-        players[msg.message.server.id]['status']=False
-        players[msg.message.server.id]['message'] = None
-
-    if msg.message.author.voice_channel == bot.user.voice_channel:
-        await bot.voice_client_in(msg.message.server).disconnect()
+    async def voice_check(self,msg):
+        """
+        function used to make bot leave voice channel if music not being played for longer than 2 minutes
+        """
+        if msg.voice_client is not None:
+            await asyncio.sleep(120)
+            if msg.voice_client is not None and msg.voice_client.is_playing() is False and msg.voice_client.is_paused() is False:
+                await msg.voice_client.disconnect()
 
 
-@bot.command(pass_context=True)
-async def join(msg):
-    """
-    Join a voice channel that you are currently in
-    Command: s.join
-    Example: s.join
-    """
-    if msg.message.author.voice_channel != None:
-        await bot.join_voice_channel(msg.message.author.voice_channel)
-    else:
-        await bot.say("You must be in a voice channel to use this command")
+    async def clear_data(self,msg):
+        """
+        Clear the local dict data
+            name - remove file name from dict
+            remove file and filename from directory
+            remove filename from global audio file names
+        """
+        name=self.player[msg.guild.id]['name']
+        os.remove(name)
+        self.player['audio_files'].remove(name)
 
-@bot.command(pass_context=True)
-async def pause(msg):
-    """
-    Pause the current audio streamer
-    Command: s.pause
-    Example: s.pause
-    """
-    if msg.message.server.id in players:
-        if players[msg.message.server.id]['stream'] != None:
-            if players[msg.message.server.id]['status'] == True:
-                await bot.say("Audio already paused")
-            
-            if players[msg.message.server.id]['status'] == False:
-                players[msg.message.server.id]['stream'].pause()
-                players[msg.message.server.id]['status']=True
-            
+
+    async def loop_song(self,msg):
+        """
+        Loop the currently playing song by replaying the same audio file via `discord.PCMVolumeTransformer()`
+        """
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(self.player[msg.guild.id]['name']))
+        loop=asyncio.get_event_loop()
+        try:
+            msg.voice_client.play(source, after=lambda a: loop.create_task(self.done(msg)))
+        except Exception as Error:
+            #Has no attribute play
+            print(Error) #NOTE: output back the error for later debugging
+
+
+    async def done(self,msg,msgId:int=None):
+        """
+        Function to run once song completes
+        Delete the "Now playing" message via ID
+        """
+        if msgId:
+            try:
+                # chan=self.bot.get_channel(msg.channel.id)
+                message=await msg.channel.fetch_message(msgId)
+                await message.delete()
+            except Exception as Error:
+                print("Failed to get the message")
+
+        if msg.guild.id in self.player and self.player[msg.guild.id]['repeat'] is True:
+            return await self.loop_song(msg)
+
+        await self.clear_data(msg)
+
+        if self.player[msg.guild.id]['queue']:
+            queue_data=self.player[msg.guild.id]['queue'].pop(0)
+            return await self.start_song(msg=queue_data['author'],song=queue_data['title'])
+
 
         else:
-            await bot.say("No audio playing in voice channel")
-    else:
-        await bot.say("No audio in voice channel")
+            self.player[msg.guild.id]['play']=False
+            await self.voice_check(msg)
     
 
-@bot.command(pass_context=True)
-async def resume(msg):
-    """
-    Resume the current audio streamer
-    Command: s.resume
-    Example: s.resume
-    """
-    if msg.message.server.id in players:
-        if players[msg.message.server.id]['stream'] !=None:
-            if players[msg.message.server.id]['status'] == False:
-                await bot.say("Audio already playing")
-            
-            if players[msg.message.server.id]['status'] == True:
-                players[msg.message.server.id]['stream'].resume()
-            
+    async def start_song(self,msg,song):
+        new_opts=ytdl_format_options.copy()
+        audio_name=await self.filename_generator()
+
+        self.player['audio_files'].append(audio_name)
+        new_opts['outtmpl']=new_opts['outtmpl'].format(audio_name)
+
+        ytdl=youtube_dl.YoutubeDL(new_opts)
+        download1=await Downloader.video_url(song,ytdl=ytdl,loop=self.bot.loop)
+
+        download=download1[0]
+        data=download1[1]
+        self.player[msg.guild.id]['name']=audio_name
+        emb=discord.Embed(colour=discord.Color.from_rgb(self.random_color(),self.random_color(),self.random_color()), title='Now Playing',description=download.title,url=download.url)
+        emb.set_thumbnail(url=download.thumbnail)
+        emb.set_footer(text=f'Requested by {msg.author.display_name}',icon_url=msg.author.avatar_url)
+        loop=asyncio.get_event_loop()
+
+
+        """"
+        REMOVE IT FROM DOC STRING IF YOU KNOW HOW TO USE PYMONGODB
+        YOU WILL NEED TO CREATE SAME DATA STRUCTURE ON MONGODB IF YOU'RE USING THE SAME CODE
+        if str(msg.guild.id) in self.music['guilds']: #NOTE adds user's default volume if in database
+            msg.voice_client.source.volume=self.music['guilds'][str(msg.guild.id)]['vol']/100
+        """
+
+        if data['queue']:
+            await self.playlist(data,msg)
+
+        msgId=await msg.send(embed=emb)
+        self.player[msg.guild.id]['player']=download
+        self.player[msg.guild.id]['author']=msg
+        msg.voice_client.play(download,after=lambda a: loop.create_task(self.done(msg,msgId.id)))
+        return msg.voice_client
+
+
+
+    @command()
+    async def play(self,msg,*,song):
+        if msg.guild.id in self.player:
+            if self.player[msg.guild.id]['play'] is True:
+                return await self.queue(msg,song)
+
+            if self.player[msg.guild.id]['queue']:
+                return await self.queue(msg,song)
+
+            if self.player[msg.guild.id]['play'] is False and not self.player[msg.guild.id]['queue']:
+                return await self.start_song(msg,song)
+
+
         else:
-            await bot.say("No audio playing in voice channel")
-    else:
-        await bot.say("No audio playing in voice channel")
+            #IMPORTANT: THE ONLY PLACE WHERE NEW `self.player[msg.guild.id]={}` IS CREATED
+            self.player[msg.guild.id]={
+                'player':None,
+                'queue':[],
+                'play':True,
+                'author':msg,
+                'name':None,
+                'repeat':False
+            }
+            return await self.start_song(msg,song)
 
 
-@bot.command(pass_context=True)
-async def volume(msg,vol:float):
-    """
-    Change the volume of the current audio streamer (1.0 == 100% and 2.0 == 200%)
-    Command: s.volume <volume_amount>
-    Example: s.volume 1.5
-    """
-    if msg.message.server.id in players:
-        if players[msg.message.server.id]['stream'] !=None:
-            players[msg.message.server.id]['stream'].volume=vol
-            players[msg.message.server.id]['volume']=vol
+    @play.before_invoke
+    async def before_play(self,msg):
+        """
+        Check voice_client
+            - User voice = None:
+                please join a voice channel
+            - bot voice == None:
+                joins the user's voice channel
+            - user and bot voice NOT SAME:
+                - music NOT Playing AND queue EMPTY
+                    join user's voice channel
+                - items in queue:
+                    please join the same voice channel as the bot to add song to queue
+        """
+    
+        if msg.author.voice is None:
+            return await msg.send('**Please join a voice channel to play music**'.title())
 
-#TODL: complete this volume options and make it better if possible
+        if msg.voice_client is None: 
+            return await msg.author.voice.channel.connect()
 
-@bot.command(pass_context=True)
-async def skip(msg):
-    """
-    Skip the current song that's playing
-    Command: s.skip
-    Example: s.skip
-    """
-    if msg.message.server.id in players:
-        if players[msg.message.server.id]['stream'] !=None:
-            if not players[msg.message.server.id]['songs']:
-                players[msg.message.server.id]['stream'].stop()
-                await player_control(msg.message.server)
-                reply=await bot.say("Skipped song\nNo songs in queue to play next")
-                await asyncio.sleep(10)
-                await bot.delete_message(reply)
+
+        if msg.voice_client.channel != msg.author.voice.channel:
             
-            if players[msg.message.server.id]['songs']:
-                players[msg.message.server.id]['stream'].stop()
-                reply=await bot.say("Song Skipped")
-                await asyncio.sleep(10)
-                await bot.delete_message(reply)
+            #NOTE: Check player and queue 
+            if msg.voice_client.is_playing() is False and not self.player[msg.guild.id]['queue']:
+                return await msg.voice_client.move_to(msg.author.voice.channel)
+                #NOTE: move bot to user's voice channel if queue does not exist
+            
+            if self.player[msg.guild.id]['queue']:
+                #NOTE: user must join same voice channel if queue exist
+                return await msg.send("Please join the same voice channel as the bot to add song to queue")
+            
+        
+    @command()
+    async def repeat(self,msg):
+        """
+        Repeat the currently playing or turn off by using the command again
+        `Ex:` .repeat
+        """
+        if msg.guild.id in self.player:
+            if self.player[msg.guild.id]['play'] is True:
+                if self.player[msg.guild.id]['repeat'] is True:
+                    self.player[msg.guild.id]['repeat']=False
+                    return await msg.message.add_reaction(emoji='✅')
+                    
+                self.player[msg.guild.id]['repeat']=True
+                return await msg.message.add_reaction(emoji='✅')
 
-        if players[msg.message.server.id]['stream']== None:
-            await bot.say("No audio currently playing")
+            return await msg.send("No audio currently playing")
+        return await msg.send("Bot not in voice channel or playing music")
 
 
-@bot.command(pass_context=True)
-async def clear_songs(msg):
-    """
-    Clear the songs and also stop the current audio playing
-    Command: s.clear
-    Example: s.clear
-    """
-    if msg.message.server.id in players:
-        if players[msg.message.server.id]['stream'] != None:
-            players[msg.message.server.id]['stream'].stop()
-            players[msg.message.server.id]['stream'] = None
-            players[msg.message.server.id]['songs'].clear()
-            await bot.say("All songs cleared")
+
+    @command()
+    async def skip(self,msg):
+        if msg.author.voice is not None:
+            if msg.author.voice.channel != msg.voice_client.channel:
+                return await msg.send("Please join the same voice channel as the bot")
+
+        if msg.author.voice is None:
+            return await msg.send("Please join the same voice channel as the bot")
+
+        if msg.voice_client is None:
+            return await msg.send("**No music currently playing**".title(),delete_after=60)
+        
         else:
-            await bot.say("No songs playing or in queue")
+            if not self.player[msg.guild.id]['queue'] and self.player[msg.guild.id]['play'] is False:
+                return await msg.send("**No songs in queue to skip**".title(),delete_after=60)
 
-    else:
-        await bot.say("No songs playing or in queue")
+        
+        await msg.send("**Skipping song...**".title(),delete_after=20)
+
+        return msg.voice_client.stop()
+    
 
 
-@bot.command(pass_context=True)
-async def songs(msg):
-    """
-    Check the current lists of songs that are in queue
-    Command: s.songs
-    Example: s.songs
-    """
-    if msg.message.server.id in players:
-        if players[msg.message.server.id]['songs']:
-            song_order=discord.Embed(title='Songs',description='Current songs in queue')
-            for i in players[msg.message.server.id]['songs']:
-                song_order.add_field(name=i['author'].display_name,value=i['title'],inline=False)
-            await bot.say(embed=song_order)
+    @commands.has_permissions(manage_channels=True)
+    @command()
+    async def stop(self,msg):
+        if msg.author.voice is not None and msg.voice_client is not None:
+            if  msg.voice_client.is_playing() is True or self.player[msg.guild.id]['queue']:
+                self.player[msg.guild.id]['queue'].clear()
+                msg.voice_client.stop()
+                return await msg.voice_client.disconnect(), await msg.message.add_reaction(emoji='✅')
+
+
+
+    @commands.has_permissions(manage_channels=True)
+    @command()
+    async def pause(self,msg):
+        if msg.author.voice is not None and msg.voice_client is not None:
+            if msg.voice_client.is_paused() is True:
+                return await msg.send("Song is already paused")
+
+            if msg.voice_client.is_paused() is False:
+                msg.voice_client.pause()
+                await msg.message.add_reaction(emoji='✅')
+
+
+
+
+    @commands.has_permissions(manage_channels=True)
+    @command()
+    async def resume(self,msg):
+        if msg.author.voice is not None and msg.voice_client is not None:
+            if msg.voice_client.is_paused() is False:
+                return await msg.send("Song is already playing")
+
+            if msg.voice_client.is_paused() is True:
+                msg.voice_client.resume()
+                return await msg.message.add_reaction(emoji='✅')
+
+
+
+    @command(name='queue',aliases=['song-list','q','current-songs'])
+    async def _queue(self,msg):
+        if msg.voice_client is not None:
+            if msg.guild.id in self.player:
+                if self.player[msg.guild.id]['queue']:
+                    emb=discord.Embed(colour=discord.Color.from_rgb(self.random_color(),self.random_color(),self.random_color()), title='queue')
+                    emb.set_footer(text=f'Command used by {msg.author.name}',icon_url=msg.author.avatar_url)
+                    for i in self.player[msg.guild.id]['queue']:
+                        emb.add_field(name=f"**{i['author'].author.name}**",value=i['title'],inline=False)
+                    return await msg.send(embed=emb,delete_after=120)
+
+        return await msg.send("No songs in queue")
+
+
+
+    @command(name='current-song',aliases=['song?',''])
+    async def nowplaying(self,msg):
+        if msg.voice_client is not None and msg.voice_client.is_playing() is True:
+            emb=discord.Embed(colour=discord.Color.from_rgb(self.random_color(),self.random_color(),self.random_color()), title='Currently Playing',description=self.player[msg.guild.id]['player'].title)
+            emb.set_footer(text=f"{self.player[msg.guild.id]['author'].author.name}",icon_url=msg.author.avatar_url)
+            emb.set_thumbnail(url=self.player[msg.guild.id]['player'].thumbnail)
+            return await msg.send(embed=emb,delete_after=120)
+        
+        return await msg.send(f"**No songs currently playing**".title(),delete_after=30)
+
+
+
+    @command(aliases=['move-bot','move-b','mb','mbot'])
+    async def join(self, msg, *, channel: discord.VoiceChannel=None):
+        """
+        Make bot join a voice channel you are in if no channel is mentioned
+        `Ex:` .join
+        `Ex:` .join Gen Voice
+        """
+        if msg.voice_client is not None:
+            return await msg.send(f"Bot is already in a voice channel\nDid you mean to use {msg.prefix}moveTo")
+
+        if msg.voice_client is None:
+            if channel is None:
+                return await msg.author.voice.channel.connect(), await msg.message.add_reaction(emoji='✅')
+            
+            return await channel.connect(), await msg.message.add_reaction(emoji='✅')
+        
         else:
-            await bot.say("Currently no songs in queue")
+            if self.player[msg.guild.id]['play'] is False and not self.player[msg.guild.id]['queue']:
+                return await msg.author.voice.channel.connect(), await msg.message.add_reaction(emoji='✅')
 
 
-bot.run('YUR BOT TOKEN HERE')
+    @join.before_invoke
+    async def before_join(self,msg):
+        if msg.author.voice is None:
+            return await msg.send("You are not in a voice channel")
+
+
+
+    @join.error
+    async def join_error(self,msg,error):
+        if isinstance(error,commands.BadArgument):
+            return msg.send(error)
+
+        # if error.args[0] == 'Command raised an exception: Exception: queue':
+        #     return await msg.send("**Please join the same voice channel as the bot to add song to queue**".title())
+
+        if error.args[0] == 'Command raised an exception: Exception: playing':
+            return await msg.send("**Please join the same voice channel as the bot to add song to queue**".title())
+
+
+
+    @commands.has_permissions(manage_channels=True)
+    @command(aliases=['vol'])
+    async def volume(self,msg,vol:int):
+        """
+        Change the volume of the bot
+        `Ex:` .vol 100
+        `Ex:` .vol 150
+        `Note:` 200 is the max
+        `Permission:` manage_channels
+        """
+        
+        if vol > 200:
+            vol = 200
+        vol=vol/100
+        if msg.author.voice is not None:
+            if msg.voice_client is not None:
+                if msg.voice_client.channel == msg.author.voice.channel and msg.voice_client.is_playing() is True:
+                    msg.voice_client.source.volume=vol
+                    return await msg.message.add_reaction(emoji='✅')
+                    
+
+
+        
+        return await msg.send("**Please join the same voice channel as the bot to use the command**".title(),delete_after=30)
+    
+    @volume.error
+    async def volume_error(self,msg,error):
+        if isinstance(error,commands.MissingPermissions):
+            return await msg.send("Manage channels or admin perms required to change volume",delete_after=30)
+
+
+
+
+def setup(bot):
+    bot.add_cog(MusicPlayer(bot))
