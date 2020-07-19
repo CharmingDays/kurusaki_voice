@@ -22,7 +22,7 @@ ytdl_format_options= {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+    'source_address': '0.0.0.0' #bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
 stim= {
@@ -45,7 +45,7 @@ ffmpeg_options = {
 }
 
 class Downloader(discord.PCMVolumeTransformer):
-    def __init__(self,source,*,data,volume=0.6):
+    def __init__(self,source,*,data,volume=0.5):
         super().__init__(source,volume)
         self.data=data
         self.title=data.get('title')
@@ -60,6 +60,9 @@ class Downloader(discord.PCMVolumeTransformer):
 
     @classmethod
     async def video_url(cls,url,ytdl,*,loop=None,stream=False):
+        """
+        Download the song file and data
+        """
         loop=loop or asyncio.get_event_loop()
         data= await loop.run_in_executor(None,lambda: ytdl.extract_info(url,download=not stream))
         data1={'queue':[]}
@@ -77,6 +80,9 @@ class Downloader(discord.PCMVolumeTransformer):
 
 
     async def get_info(self,url):
+        """
+        Get the info of the next song by not downloading the actual file but just the data of song/query
+        """
         yt=youtube_dl.YoutubeDL(stim)
         down=yt.extract_info(url,download=False)
         data1={'queue':[]}
@@ -93,8 +99,8 @@ class Downloader(discord.PCMVolumeTransformer):
 class MusicPlayer(commands.Cog,name='Music'):
     def __init__(self,client):
         self.bot=client
-        self.database = pymongo.MongoClient(os.getenv('MONGO'))['Discord-Bot-Database']['General']
-        self.music=self.database.find_one('music')
+        # self.database = pymongo.MongoClient(os.getenv('MONGO'))['Discord-Bot-Database']['General']
+        # self.music=self.database.find_one('music')
         self.player={
             "audio_files":[]
         }
@@ -103,24 +109,34 @@ class MusicPlayer(commands.Cog,name='Music'):
     def random_color(self):
         return discord.Color.from_rgb(random.randint(1,255),random.randint(1,255),random.randint(1,255))
 
-    def cog_unload(self):
-        current=self.database.find_one('music')
-        if current != self.voice:
-            self.database.update_one({'_id':'music'},{'$set':self.music})
+    # def cog_unload(self):
+    #     """
+    #     Update the database in mongodb to the latest changes when the bot is disconnecting
+    #     """
+    #     current=self.database.find_one('music')
+    #     if current != self.voice:
+    #         self.database.update_one({'_id':'music'},{'$set':self.music})
 
 
 
     @commands.Cog.listener('on_voice_state_update')
     async def music_voice(self,user,before,after):
+        """
+        Clear the server's playlist after bot leave the voice channel
+        """
         if after.channel is None and user.id == self.bot.user.id:
             try:
                 self.player[user.guild.id]['queue'].clear()
             except KeyError:
+                #NOTE: server ID not in bot's local self.player dict
                 print(f"Failed to get guild id {user.guild.id}") #Server ID lost or was not in data before disconnecting
 
 
 
     async def filename_generator(self):
+        """
+        Generate a unique file name for the song file to be named as
+        """
         chars=list(string.ascii_letters+string.digits)
         name=''
         for i in range(random.randint(9,25)):
@@ -134,19 +150,27 @@ class MusicPlayer(commands.Cog,name='Music'):
 
 
     async def playlist(self,data,msg):
+        """
+        THIS FUNCTION IS FOR WHEN YOUTUBE LINK IS A PLAYLIST
+        Add song into the server's playlist inside the self.player dict 
+        """
         for i in data['queue']:
             self.player[msg.guild.id]['queue'].append({'title':i,'author':msg})
 
 
 
     async def queue(self,msg,song):
+        """
+        Add the query/song to the queue of the server
+        """
         title1=await Downloader.get_info(self,url=song)
         title=title1[0]
         data=title1[1]
         #NOTE:needs fix here
         if data['queue']:
             await self.playlist(data,msg)
-            return await msg.send(f"Added playlist {data['title']} to queue") #NOTE: needs to be embeded to make it better output
+            #NOTE: needs to be embeded to make it better output
+            return await msg.send(f"Added playlist {data['title']} to queue")
         self.player[msg.guild.id]['queue'].append({'title':title,'author':msg})
         return await msg.send(f"**{title} added to queue**".title())
 
@@ -182,8 +206,8 @@ class MusicPlayer(commands.Cog,name='Music'):
         loop=asyncio.get_event_loop()
         try:
             msg.voice_client.play(source, after=lambda a: loop.create_task(self.done(msg)))
-            if str(msg.guild.id) in self.music:
-                msg.voice_client.source.volume=self.music['vol']/100
+            # if str(msg.guild.id) in self.music:
+            #     msg.voice_client.source.volume=self.music['vol']/100
         except Exception as Error:
             #Has no attribute play
             print(Error) #NOTE: output back the error for later debugging
@@ -248,8 +272,8 @@ class MusicPlayer(commands.Cog,name='Music'):
         self.player[msg.guild.id]['author']=msg
         msg.voice_client.play(download,after=lambda a: loop.create_task(self.done(msg,msgId.id)))
 
-        if str(msg.guild.id) in self.music: #NOTE adds user's default volume if in database
-            msg.voice_client.source.volume=self.music[str(msg.guild.id)]['vol']/100
+        # if str(msg.guild.id) in self.music: #NOTE adds user's default volume if in database
+        #     msg.voice_client.source.volume=self.music[str(msg.guild.id)]['vol']/100
         return msg.voice_client
 
 
@@ -563,8 +587,8 @@ class MusicPlayer(commands.Cog,name='Music'):
             if msg.voice_client is not None:
                 if msg.voice_client.channel == msg.author.voice.channel and msg.voice_client.is_playing() is True:
                     msg.voice_client.source.volume=vol
-                    if (msg.guild.id) in self.music:
-                        self.music[str(msg.guild.id)]['vol']=vol
+                    # if (msg.guild.id) in self.music:
+                    #     self.music[str(msg.guild.id)]['vol']=vol
                     return await msg.message.add_reaction(emoji='✅')
                     
         
