@@ -1,10 +1,13 @@
-import discord,asyncio,random,pymongo,youtube_dl,string,os
+import discord,asyncio,random,youtube_dl,string,os
 from discord.ext import commands
 from discord.ext.commands import command
-
-
+#NOTE: Import pymongo if you are using the database function commands 
+#NOTE: Also add `pymongo` and `dnspython` inside the requirements.txt file if you are using pymongo
+# import pymongo
 
 #TODO: CREATE PLAYLIST SUPPORT FOR MUSIC
+
+
 
 
 #flat-playlist:True?
