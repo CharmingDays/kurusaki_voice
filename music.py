@@ -8,6 +8,10 @@ from discord.ext.commands import command
 #TODO: CREATE PLAYLIST SUPPORT FOR MUSIC
 
 
+"""
+Without database, the music bot will not save your volume
+
+"""
 
 
 #flat-playlist:True?
@@ -209,6 +213,7 @@ class MusicPlayer(commands.Cog,name='Music'):
         loop=asyncio.get_event_loop()
         try:
             msg.voice_client.play(source, after=lambda a: loop.create_task(self.done(msg)))
+            msg.voice_client.source.volume=self.player[msg.guild.id]['volume']
             # if str(msg.guild.id) in self.music:
             #     msg.voice_client.source.volume=self.music['vol']/100
         except Exception as Error:
@@ -277,6 +282,7 @@ class MusicPlayer(commands.Cog,name='Music'):
 
         # if str(msg.guild.id) in self.music: #NOTE adds user's default volume if in database
         #     msg.voice_client.source.volume=self.music[str(msg.guild.id)]['vol']/100
+        msg.voice_client.source.volume=self.player[msg.guild.id]['volume']
         return msg.voice_client
 
 
@@ -307,7 +313,8 @@ class MusicPlayer(commands.Cog,name='Music'):
                 'author':msg,
                 'name':None,
                 "reset":False,
-                'repeat':False
+                'repeat':False,
+                'volume': 0.5
             }
             return await self.start_song(msg,song)
 
@@ -590,6 +597,7 @@ class MusicPlayer(commands.Cog,name='Music'):
             if msg.voice_client is not None:
                 if msg.voice_client.channel == msg.author.voice.channel and msg.voice_client.is_playing() is True:
                     msg.voice_client.source.volume=vol
+                    self.player[msg.guild.id]['volume']=vol
                     # if (msg.guild.id) in self.music:
                     #     self.music[str(msg.guild.id)]['vol']=vol
                     return await msg.message.add_reaction(emoji='✅')
