@@ -1,17 +1,19 @@
 import discord,asyncio,random,youtube_dl,string,os
 from discord.ext import commands
+from googleapiclient.discovery import build
 from discord.ext.commands import command
+
+# import pymongo
 #NOTE: Import pymongo if you are using the database function commands 
 #NOTE: Also add `pymongo` and `dnspython` inside the requirements.txt file if you are using pymongo
-# import pymongo
 
 #TODO: CREATE PLAYLIST SUPPORT FOR MUSIC
 
 
-"""
-Without database, the music bot will not save your volume
+#NOTE: Without database, the music bot will not save your volume 
 
-"""
+
+
 
 
 #flat-playlist:True?
@@ -61,6 +63,32 @@ class Downloader(discord.PCMVolumeTransformer):
         self.duration=data.get('duration')
         self.views=data.get('view_count')
         self.playlist={}
+
+
+
+
+    @classmethod
+    async def yt_download(cls,url,ytdl,*,loop=None,stream=False):
+        """
+        Download video directly with link
+        """
+        API_KEY='API_KEY'
+        youtube=build('youtube','v3',developerKey=API_KEY)
+        data=youtube.search().list(part='snippet',q=url).execute()
+        song_url=data
+        song_info=data
+        download= await loop.run_in_executor(None,lambda: ytdl.extract_info(song_url,download=not stream))
+        filename=data['url'] if stream else ytdl.prepare_filename(download)
+        return cls(discord.FFmpegPCMAudio(filename,**ffmpeg_options),data=download),song_info
+
+    async def yt_info(self,song):
+        """
+        Get info from youtube
+        """
+        API_KEY='API_KEY'
+        youtube=build('youtube','v3',developerKey=API_KEY)
+        song_data=youtube.search().list(part='snippet').execute()
+        return song_data[0]
 
 
 
