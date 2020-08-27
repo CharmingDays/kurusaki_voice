@@ -8,7 +8,7 @@ import os
 def get_prefix(bot, msg):
     """A callable Prefix for our bot. This could be edited to allow per server prefixes."""
 
-    prefixes = ['s.']
+    prefixes = ['s.'] #Your bot prefix(s)
 
     return commands.when_mentioned_or(*prefixes)(bot, msg)
 
@@ -30,9 +30,10 @@ async def on_ready():
 
 
 
+
+
 for i in exts:
     bot.load_extension(i)
-
 
 
 bot.run(os.environ['TOKEN'])
