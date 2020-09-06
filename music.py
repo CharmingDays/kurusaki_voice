@@ -18,8 +18,11 @@ from discord.ext.commands import command
 
 #flat-playlist:True?
 #extract_flat:True
+#audioquality 0 best 9 worst
+#format bestaudio/best or worstaudio
 ytdl_format_options= {
-    'format': 'bestaudio/best',
+    'audioquality':8,
+    'format': 'worstaudio',
     'outtmpl': '{}',
     'restrictfilenames': True,
     'noplaylist': True,

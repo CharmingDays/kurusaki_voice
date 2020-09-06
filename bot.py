@@ -1,6 +1,9 @@
 import discord,asyncio,youtube_dl
 from discord.ext import commands
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 
@@ -36,4 +39,4 @@ for i in exts:
     bot.load_extension(i)
 
 
-bot.run(os.environ['TOKEN'])
+# bot.run(os.environ['TOKEN'])
