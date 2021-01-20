@@ -1,4 +1,6 @@
-import discord,asyncio,random,youtube_dl,string,os
+import discord,asyncio
+import random,youtube_dl,string,os
+import pymongo
 from discord.ext import commands
 from googleapiclient.discovery import build
 from discord.ext.commands import command
@@ -20,12 +22,13 @@ from discord.ext.commands import command
 #extract_flat:True
 #audioquality 0 best 9 worst
 #format bestaudio/best or worstaudio
+# 'noplaylist': None
 ytdl_format_options= {
-    'audioquality':8,
-    'format': 'worstaudio',
+    'audioquality':5,
+    'format': 'bestaudio',
     'outtmpl': '{}',
     'restrictfilenames': True,
-    'noplaylist': True,
+    'flatplaylist':True,
     'nocheckcertificate': True,
     'ignoreerrors': True,
     'logtostderr': False,
@@ -68,34 +71,6 @@ class Downloader(discord.PCMVolumeTransformer):
         self.playlist={}
 
 
-
-
-    @classmethod
-    async def yt_download(cls,url,ytdl,*,loop=None,stream=False):
-        """
-        Download video directly with link
-        """
-        API_KEY='API_KEY'
-        youtube=build('youtube','v3',developerKey=API_KEY)
-        data=youtube.search().list(part='snippet',q=url).execute()
-        song_url=data
-        song_info=data
-        download= await loop.run_in_executor(None,lambda: ytdl.extract_info(song_url,download=not stream))
-        filename=data['url'] if stream else ytdl.prepare_filename(download)
-        return cls(discord.FFmpegPCMAudio(filename,**ffmpeg_options),data=download),song_info
-
-    async def yt_info(self,song):
-        """
-        Get info from youtube
-        """
-        API_KEY='API_KEY'
-        youtube=build('youtube','v3',developerKey=API_KEY)
-        song_data=youtube.search().list(part='snippet').execute()
-        return song_data[0]
-
-
-
-
     @classmethod
     async def video_url(cls,url,ytdl,*,loop=None,stream=False):
         """
@@ -103,17 +78,17 @@ class Downloader(discord.PCMVolumeTransformer):
         """
         loop=loop or asyncio.get_event_loop()
         data= await loop.run_in_executor(None,lambda: ytdl.extract_info(url,download=not stream))
-        data1={'queue':[]}
+        song_list = {'queue':[]}
         if 'entries' in data:
             if len(data['entries']) >1:
                 playlist_titles=[title['title'] for title in data['entries']]
-                data1={'title':data['title'],'queue':playlist_titles}
-                data1['queue'].pop(0)
+                song_list={'queue':playlist_titles}
+                song_list['queue'].pop(0)
 
             data=data['entries'][0]
                 
         filename=data['url'] if stream else ytdl.prepare_filename(data)
-        return cls(discord.FFmpegPCMAudio(filename,**ffmpeg_options),data=data),data1
+        return cls(discord.FFmpegPCMAudio(filename,**ffmpeg_options),data=data),song_list
 
 
 
@@ -135,25 +110,36 @@ class Downloader(discord.PCMVolumeTransformer):
 
 
 class MusicPlayer(commands.Cog,name='Music'):
-    def __init__(self,client):
-        self.bot=client
-        # self.database = pymongo.MongoClient(os.getenv('MONGO'))['Discord-Bot-Database']['General']
+    def __init__(self,bot):
+        self.bot=bot
         # self.music=self.database.find_one('music')
         self.player={
             "audio_files":[]
         }
+        # self.database_setup()
 
+    def database_setup(self):
+        URL = os.getenv("MONGO")
+        if URL is None:
+            return False
+
+
+    
     @property
     def random_color(self):
         return discord.Color.from_rgb(random.randint(1,255),random.randint(1,255),random.randint(1,255))
 
-    # def cog_unload(self):
-    #     """
-    #     Update the database in mongodb to the latest changes when the bot is disconnecting
-    #     """
-    #     current=self.database.find_one('music')
-    #     if current != self.voice:
-    #         self.database.update_one({'_id':'music'},{'$set':self.music})
+    
+
+    async def yt_info(self,song):
+        """
+        Get info from youtube
+        """
+        API_KEY='API_KEY'
+        youtube=build('youtube','v3',developerKey=API_KEY)
+        song_data=youtube.search().list(part='snippet').execute()
+        return song_data[0]
+
 
 
 
@@ -193,6 +179,7 @@ class MusicPlayer(commands.Cog,name='Music'):
         Add song into the server's playlist inside the self.player dict 
         """
         for i in data['queue']:
+            print(i)
             self.player[msg.guild.id]['queue'].append({'title':i,'author':msg})
 
 
@@ -291,7 +278,6 @@ class MusicPlayer(commands.Cog,name='Music'):
 
         ytdl=youtube_dl.YoutubeDL(new_opts)
         download1=await Downloader.video_url(song,ytdl=ytdl,loop=self.bot.loop)
-
         download=download1[0]
         data=download1[1]
         self.player[msg.guild.id]['name']=audio_name
@@ -443,7 +429,7 @@ class MusicPlayer(commands.Cog,name='Music'):
             return await msg.send("Please join the same voice channel as the bot")
         
         
-        if self.player[msg.guild.id]['queue'] and msg.voice_client.is_playing() is False:
+        if not self.player[msg.guild.id]['queue'] and msg.voice_client.is_playing() is False:
             return await msg.send("**No songs in queue to skip**".title(),delete_after=60)
 
 

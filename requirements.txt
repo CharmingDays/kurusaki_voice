@@ -1,4 +1,6 @@
 git+https://github.com/Rapptz/discord.py
 git+https://github.com/ytdl-org/youtube-dl
 PyNaCl
-google-api-python-client
+# google-api-python-client
+# pymongo
+# dnspython
