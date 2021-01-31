@@ -8,10 +8,7 @@ from discord.ext.commands import command
 # import pymongo
 #NOTE: Import pymongo if you are using the database function commands 
 #NOTE: Also add `pymongo` and `dnspython` inside the requirements.txt file if you are using pymongo
-
 #TODO: CREATE PLAYLIST SUPPORT FOR MUSIC
-
-
 #NOTE: Without database, the music bot will not save your volume 
 
 
@@ -24,7 +21,7 @@ from discord.ext.commands import command
 #format bestaudio/best or worstaudio
 # 'noplaylist': None
 ytdl_format_options= {
-    'audioquality':5,
+    'audioquality':0,
     'format': 'bestaudio',
     'outtmpl': '{}',
     'restrictfilenames': True,
@@ -116,7 +113,19 @@ class MusicPlayer(commands.Cog,name='Music'):
         self.player={
             "audio_files":[]
         }
+        self.yt_setup()
         # self.database_setup()
+
+
+    def yt_setup(self):
+        api = os.getenv('YT_TOKEN')
+        if api is None:
+            return False
+
+        setattr(self,'yt_api',api)
+
+
+
 
     def database_setup(self):
         URL = os.getenv("MONGO")
@@ -128,19 +137,6 @@ class MusicPlayer(commands.Cog,name='Music'):
     @property
     def random_color(self):
         return discord.Color.from_rgb(random.randint(1,255),random.randint(1,255),random.randint(1,255))
-
-    
-
-    async def yt_info(self,song):
-        """
-        Get info from youtube
-        """
-        API_KEY='API_KEY'
-        youtube=build('youtube','v3',developerKey=API_KEY)
-        song_data=youtube.search().list(part='snippet').execute()
-        return song_data[0]
-
-
 
 
     @commands.Cog.listener('on_voice_state_update')
@@ -304,6 +300,22 @@ class MusicPlayer(commands.Cog,name='Music'):
 
 
 
+
+    async def yt_download(self,msg,url):
+        """
+        Download video directly with link via Youtube API
+        """
+
+        youtube=build('youtube','v3',developerKey=self.yt_api)
+        data=youtube.search().list(part='snippet',q=url).execute()
+        song_url=data
+        song_info=data
+        download = await self.start_song(msg,url)
+
+
+
+
+
     @command()
     async def play(self,msg,*,song):
         """
@@ -313,12 +325,19 @@ class MusicPlayer(commands.Cog,name='Music'):
         """
         if msg.guild.id in self.player:
             if msg.voice_client.is_playing() is True:#NOTE: SONG CURRENTLY PLAYING
+                if hasattr(self,'yt_api'):
+                    return await self.yt_download(msg,song)
+
                 return await self.queue(msg,song)
 
             if self.player[msg.guild.id]['queue']:
+                if hasattr(self,'yt_api'):
+                    return await self.yt_download(msg,song)
                 return await self.queue(msg,song)
 
             if msg.voice_client.is_playing() is False  and not self.player[msg.guild.id]['queue']:
+                if hasattr(self,'yt_api'):
+                    return await self.yt_download(msg,song)
                 return await self.start_song(msg,song)
 
 
