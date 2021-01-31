@@ -20,7 +20,7 @@ bot=commands.Bot(command_prefix=get_prefix,description='Multipurpose Discord Bot
 
 
 
-exts=['music'] #Add your Cog extensions here
+exts=['lava'] #Add your Cog extensions here
 
 
 @bot.event
