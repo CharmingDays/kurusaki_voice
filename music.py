@@ -40,6 +40,27 @@ ytdl_format_options= {
     'source_address': '0.0.0.0' #bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
+### Download youtube-dl options
+ytdl_download_format_options= {
+    'format': 'bestaudio/best',
+    'outtmpl': 'downloads/%(title)s.mp3',
+    'reactrictfilenames': True,
+    'noplaylist': True,
+    'nocheckcertificate': True,
+    'ignoreerrors': False,
+    'logtostderr': False,
+    'quiet': True,
+    'no_warnings': True,
+    'default_search': 'auto',
+    'source_addreacs': '0.0.0.0',  # bind to ipv4 since ipv6 addreacses cause issues sometimes
+    'output': r'youtube-dl',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '320',
+}]
+}
+
 stim= {
     'default_search': 'auto',
     "ignoreerrors":True,
@@ -621,7 +642,30 @@ class MusicPlayer(commands.Cog,name='Music'):
                     
         
         return await msg.send("**Please join the same voice channel as the bot to use the command**".title(),delete_after=30)
-    
+
+    @commands.command(name='download', brief='Download songs', description='[prefix]download <video url or title> Downloads the song')
+    async def download(self,ctx,*,song):
+       """
+       Downloads the audio from given URL source and sends the audio soruce back to user to download from URL, the file will be removed from storage once sent.
+       `Ex`: .download I'll Show you K/DA
+       `Command`: download(url:required)
+       `NOTE`: file size can't exceed 8MB, otherwise it will fail to upload and cause error
+       """
+        try:
+            with youtube_dl.YoutubeDL(ytdl_download_format_options) as ydl: 
+                if "https://www.youtube.com/" in song:
+                    download = ydl.extract_info(song, True)
+                else:
+                    infosearched = ydl.extract_info("ytsearch:"+song, False)   
+                    download = ydl.extract_info(infosearched['entries'][0]['webpage_url'], True)
+                filename = ydl.prepare_filename(download)
+                embed=discord.Embed(title="Your download is ready", description="Please wait a moment while the file is beeing uploaded")
+                await ctx.send(embed=embed,delete_after=30)
+                await ctx.send(file=discord.File(filename))
+                os.remove(filename)                    
+        except(youtube_dl.utils.ExtractorError, youtube_dl.utils.DownloadError):
+            embed=discord.Embed(title="Song couldn't be downloaded", description=("Song:"+song))
+            await ctx.send(embed=embed)
 
     
     @volume.error
