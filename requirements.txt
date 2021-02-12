@@ -4,3 +4,4 @@ PyNaCl
 # google-api-python-client
 # pymongo
 # dnspython
+lavalink

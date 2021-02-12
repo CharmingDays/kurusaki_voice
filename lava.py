@@ -7,7 +7,8 @@ Usage of this cog requires Python 3.6 or higher due to the use of f-strings.
 Compatibility with Python 3.5 should be possible if f-strings are removed.
 """
 import re
-
+import os
+import pymongo
 import discord
 import lavalink
 from discord.ext import commands
@@ -21,10 +22,29 @@ class Music(commands.Cog):
 
         if not hasattr(bot, 'lavalink'):  # This ensures the client isn't overwritten during cog reloads.
             bot.lavalink = lavalink.Client(bot.user.id)
-            bot.lavalink.add_node('127.0.0.1', 2333, 'youshallnotpass', 'eu', 'default-node')  # Host, Port, Password, Region, Name
+            bot.lavalink.add_node('45.33.117.88', 2333, 'kurusakipassword', 'na', 'default-node')  # Host, Port, Password, Region, Name
             bot.add_listener(bot.lavalink.voice_update_handler, 'on_socket_response')
 
         lavalink.add_event_hook(self.track_hook)
+        # self.load_db()
+
+    def load_db(self):
+        mongo = os.getenv('MONGO')
+        if mongo is None:
+            setattr(self,'db',False)
+            return False
+        connection = pymongo.MongoClient(mongo)
+        collection = connection['Discord-Bot-Database']['General']
+        sheet = collection.find_one('music')
+        connection.close()
+        setattr(self,'db',True)
+        setattr(self,'client',connection)
+        setattr(self,'collection',collection)
+        setattr(self,'doc',sheet)
+
+
+
+
 
     def cog_unload(self):
         """ Cog unload handler. This removes any event hooks that were registered. """
@@ -71,7 +91,7 @@ class Music(commands.Cog):
 
         if not player.is_connected:
             if not should_connect:
-                raise commands.CommandInvokeError('Not connected.')
+                raise commands.CommandInvokeError('Not connected.\nPlease use the `play` command to make the bot join and `move` to move the bot to different channels.')
 
             permissions = ctx.author.voice.channel.permissions_for(ctx.me)
 
@@ -154,7 +174,7 @@ class Music(commands.Cog):
         if not player.is_playing:
             await player.play()
 
-    @commands.command(aliases=['dc'])
+    @commands.command(aliases=['dc','stop'])
     async def disconnect(self, ctx):
         """ Disconnects the player from the voice channel and clears its queue. """
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
@@ -176,6 +196,123 @@ class Music(commands.Cog):
         # Disconnect from the voice channel.
         await self.connect_to(ctx.guild.id, None)
         await ctx.send('*⃣ | Disconnected.')
+
+
+
+    @commands.has_permissions(manage_channels=True)
+    @commands.command()
+    async def move(self,msg,*,chan:discord.VoiceChannel=None):
+        if chan is None:
+            chan = msg.author.voice.channel
+        
+        await self.connect_to(msg.guild.id,chan.id)
+
+
+    @commands.has_permissions(manage_channels=True)
+    @commands.command(aliases=['vol'])
+    #max is 1000
+    async def volume(self,msg,_volume:int):
+        if _volume > 1000:
+            _volume = 1000
+            await msg.send(f"Volume exceeds limit of 1000 by {_volume-1000},\nSetting volume to limit of 1000.")
+        player = self.bot.lavalink.player_manager.get(msg.guild.id)
+        await player.set_volume(_volume)
+        return await msg.message.add_reaction('✅')
+
+
+    @commands.has_permissions(manage_channels=True)
+    @commands.command()
+    async def pause(self,msg):
+        player = self.bot.lavalink.player_manager.get(msg.guild.id)
+        if player.paused:
+            return await msg.send("Audio is already paused.",delete_after=15)
+        
+        await player.set_pause(True)
+        return await msg.message.add_reaction('✅')
+
+
+
+    @commands.has_permissions(manage_channels=True)
+    @commands.command()
+    async def resume(self,msg):
+        player = self.bot.lavalink.player_manager.get(msg.guild.id)
+        if not player.paused:
+            return await msg.send("Audio is already playing.",delete_after=15)
+
+        if player.paused:
+            await player.set_pause(False)
+            return await msg.message.add_reaction('✅')
+
+
+
+
+    @commands.has_permissions(manage_channels=True)
+    @commands.command(aliases=['rp'])
+    async def repeat(self,msg):
+        player = self.bot.lavalink.player_manager.get(msg.guild.id)
+        if player.repeat:
+            await player.set_repeat(False)
+
+        else:
+            await player.set_repeat(True)
+
+        return await msg.message.add_reaction('✅')
+    
+
+
+    @commands.has_permissions(manage_channels=True)
+    @commands.command(name='jump-to',aliases=['seek','track'])
+    async def jump_to(self,msg,track_time:int):
+        player = self.bot.lavalink.player_manager.get(msg.guild.id)
+        print(dir(player))
+        if track_time > player.current.duration:
+            track_time = player.current.duration
+            await msg.send("Track amount exceeds audio duration. Skipping song...",delete_after=30)
+
+        else:
+            track_time *=1000
+
+        await player.seek(track_time)
+        return await msg.message.add_reaction('✅')
+
+
+
+    @commands.has_permissions(manage_channels=True)
+    @commands.command()
+    async def skip(self,msg):
+        player = self.bot.lavalink.player_manager.get(msg.guild.id)
+        if not player.is_playing:
+            return await msg.send("No tracks currently playing.",delete_after=15)
+
+        await msg.send(f"Skipping tack {player.current.title}...",delete_after=15)
+        await player.skip()
+
+
+    @commands.command()
+    async def duration(self,msg):
+        player = self.bot.lavalink.player_manager.get(msg.guild.id)
+        if not player.is_playing:
+            return await msg.send("No audio currently playing.")
+        
+        return await msg.send(f"**{round((player.current.duration/1000)/60,2)}** minutes - {player.current.title}")
+
+
+    @commands.command()
+    async def queue(self,msg):
+        player = self.bot.lavalink.player_manager.get(msg.guild.id)
+        guild_queue = ""
+        if not player.queue:
+            return await msg.send("No songs in queue.",delete_after=30)
+        for song in player.queue:
+            guild_queue+=f"**{round((song.duration/1000)/60,2)}** minutes - {song.title}\n"
+
+        return await msg.send(guild_queue)
+
+
+
+        
+
+
 
 
 def setup(bot):

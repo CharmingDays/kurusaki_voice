@@ -29,14 +29,16 @@ async def on_ready():
     activity_type=discord.ActivityType.listening #Status type
     await bot.change_presence(activity=discord.Activity(type=activity_type,name=song_name))
     print(bot.user.name)
+    load_cogs()
 
 
 
 
 
 
-for i in exts:
-    bot.load_extension(i)
+def load_cogs():
+    for i in exts:
+        bot.load_extension(i)
 
 
 bot.run(os.environ['TOKEN'])
