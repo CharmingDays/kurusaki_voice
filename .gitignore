@@ -1,3 +1,4 @@
 .env
 __pycache__
 music1.py
+/logs
