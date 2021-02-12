@@ -4,7 +4,6 @@ import random
 import youtube_dl
 import string
 import os
-import pymongo
 from discord.ext import commands
 from googleapiclient.discovery import build
 from discord.ext.commands import command
