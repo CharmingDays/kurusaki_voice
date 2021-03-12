@@ -7,7 +7,6 @@ load_dotenv()
 
 
 
-
 def get_prefix(bot, msg):
     """A callable Prefix for our bot. This could be edited to allow per server prefixes."""
 
@@ -16,8 +15,6 @@ def get_prefix(bot, msg):
     return commands.when_mentioned_or(*prefixes)(bot, msg)
 
 bot=commands.Bot(command_prefix=get_prefix,description='Multipurpose Discord Bot')
-
-
 
 
 exts=['lava'] #Add your Cog extensions here
@@ -30,9 +27,6 @@ async def on_ready():
     await bot.change_presence(activity=discord.Activity(type=activity_type,name=song_name))
     print(bot.user.name)
     load_cogs()
-
-
-
 
 
 

@@ -13,6 +13,7 @@ import discord
 import lavalink
 from discord.ext import commands
 
+
 url_rx = re.compile(r'https?://(?:www\.)?.+')
 
 
@@ -22,7 +23,7 @@ class Music(commands.Cog):
 
         if not hasattr(bot, 'lavalink'):  # This ensures the client isn't overwritten during cog reloads.
             bot.lavalink = lavalink.Client(bot.user.id)
-            bot.lavalink.add_node('45.33.117.88', 2333, 'kurusakipassword', 'na', 'default-node')  # Host, Port, Password, Region, Name
+            bot.lavalink.add_node('localhost', 2333, 'kurusakipassword', 'na', 'default-node')  # Host, Port, Password, Region, Name
             bot.add_listener(bot.lavalink.voice_update_handler, 'on_socket_response')
 
         lavalink.add_event_hook(self.track_hook)
@@ -41,9 +42,6 @@ class Music(commands.Cog):
         setattr(self,'client',connection)
         setattr(self,'collection',collection)
         setattr(self,'doc',sheet)
-
-
-
 
 
     def cog_unload(self):
@@ -307,11 +305,6 @@ class Music(commands.Cog):
             guild_queue+=f"**{round((song.duration/1000)/60,2)}** minutes - {song.title}\n"
 
         return await msg.send(guild_queue)
-
-
-
-        
-
 
 
 
