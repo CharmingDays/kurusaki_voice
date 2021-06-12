@@ -12,6 +12,15 @@ from discord.ext.commands import command
 # NOTE: Import pymongo if you are using the database function commands
 # NOTE: Also add `pymongo` and `dnspython` inside the requirements.txt file if you are using pymongo
 
+# import spotipy
+# from spotipy.oauth2 import SpotifyOAuth
+# NOTE: Import spotipy if you wan't to use Spotify API to play songs
+# NOTE: Tou I'll need to Sing Up in https://developer.spotify.com/ create a new app and get the credentials
+# NOTE: These credentials you have to introduce them as an enviroment variable as:
+#           SPOTIPY_CLIENT_ID and SPOTIPY_CLIENT_SECRET
+# NOTE: All code that uses spotify api is taged with the line below, uncomment those sections if you are going to use them
+# TAG:spotify
+
 # TODO: CREATE PLAYLIST SUPPORT FOR MUSIC
 
 
@@ -139,11 +148,54 @@ class MusicPlayer(commands.Cog, name='Music'):
             "audio_files": []
         }
         # self.database_setup()
+        
+        # if self.spotify_setup():
+        #     self.sp = spotipy.Spotify(auth_manager=spotipy.SpotifyClientCredentials())
+        # TAG:spotify 
 
     def database_setup(self):
         URL = os.getenv("MONGO")
         if URL is None:
             return False
+        
+    def spotify_setup(self):
+        URL = os.getenv("SPOTIPY_CLIENT_ID")
+        if URL is None:
+            return False
+        else:
+            return True
+        
+    # async def getSpotifyData(self, song, msg):
+    #     readedSong = ''
+    #     if 'playlist' in song:
+    #         songCount = 0
+    #         songIterationCount = 100
+    #         songList = {"queue":[]}
+    #         while songIterationCount == 100:
+    #             songIterationCount = 0
+    #             results = self.sp.playlist_tracks(song, limit=None,offset=songCount)
+    #             for items in results['items']:
+    #                 songCount+=1
+    #                 songIterationCount+=1
+    #                 entry = items['track']['name']
+    #                 for artist in items['track']['artists']:
+    #                     entry += ' '+artist['name']
+    #                 if songCount == 1:
+    #                     readedSong = entry
+    #                 else:
+    #                     songList['queue'].append(entry)
+            
+    #         if self.player[msg.guild.id]['queue'] is None:
+    #             self.player[msg.guild.id]['queue'] = []
+    #         await self.play(msg=msg,song=readedSong)
+    #         await self.playlist(songList,msg)
+    #     if 'track' in song:
+    #         data = self.sp.track(song)
+    #         readedSong = data['name']
+    #         for artist in data['artists']:
+    #             readedSong += ' '+artist['name']
+    #         await self.play(msg=msg,song=readedSong)
+    # TAG:spotify 
 
     @property
     def random_color(self):
@@ -316,6 +368,10 @@ class MusicPlayer(commands.Cog, name='Music'):
         `Ex:` s.play Titanium David Guetta
         `Command:` play(song_name)
         """
+        #if "spotify.com" in song:
+        #    return await self.getSpotifyData(song=song,msg=msg)
+        # TAG:spotify
+        
         if msg.guild.id in self.player:
             if msg.voice_client.is_playing() is True:  # NOTE: SONG CURRENTLY PLAYING
                 return await self.queue(msg, song)
